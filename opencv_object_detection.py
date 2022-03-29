@@ -1,8 +1,27 @@
-pip install opencv-python numpy matplotlib
+#!/usr/bin/env python
+# coding: utf-8
 
+# In[9]:
+
+
+pip install --upgrade opencv-python numpy matplotlib
+
+
+# In[1]:
+
+
+# import opencv
 import cv2 as cv
+# import math functions
 import math
 import numpy as np
+# import system libraries
+import glob
+import os
+
+
+# In[2]:
+
 
 def find_contours_auto(image):
     # convert image to grayscale
@@ -33,6 +52,10 @@ def find_contours_auto(image):
     """
     return contours_main, contours_ext
 
+
+# In[13]:
+
+
 def find_contours_man(image, min_t, max_t, min_a, max_a):
     # convert image to grayscale
     imgray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
@@ -45,16 +68,24 @@ def find_contours_man(image, min_t, max_t, min_a, max_a):
     # external = only extreme outer contours (used for orientation)
     contours_ext, hierarchy = cv.findContours(thr, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
     
-    contours_main  = []
-    for c in contours_tree:
+    contours_t = []
+    contours_e = []
+    for t,e in zip(contours_tree, contours_ext):
         # Calculate the area of each contour
-        area = cv.contourArea(c)
+        areaT = cv.contourArea(t)
+        areaE = cv.contourArea(t)
 
         # Ignore contours that are too small or too large
-        if area > min_a and max_a > area:
-            contours_main.append(c)
+        if areaT > min_a and max_a > areaT:
+            contours_t.append(t)
+        if areaE > min_a and max_a > areaE:
+            contours_e.append(e)
 
-    return contours_main, contours_ext
+    return contours_t, contours_e
+
+
+# In[4]:
+
 
 def find_centroids(contours):
     # instantiate two empty lists
@@ -76,6 +107,10 @@ def find_centroids(contours):
         """
         
     return cX, cY
+
+
+# In[5]:
+
 
 def calculate_orientation(contours):
     # instantiate an empty list
@@ -101,6 +136,10 @@ def calculate_orientation(contours):
         cv.destroyAllWindows()
         """
     return angles
+
+
+# In[6]:
+
 
 def draw_contours(image, contours):
     # draw contours
@@ -150,17 +189,91 @@ def draw_features(image, contours, angles, cX, cY):
     cv.waitKey(0)
     cv.destroyAllWindows()
 
+
+# In[7]:
+
+
 def nothing(x): #dummy function for trackbar
     pass
 
- 
- 
 
+# In[ ]:
+
+
+# Defining the dimensions of checkerboard
+CHECKERBOARD = (6,9)
+criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+
+# Creating vector to store vectors of 3D points for each checkerboard image
+objpoints = []
+# Creating vector to store vectors of 2D points for each checkerboard image
+imgpoints = []
+
+# Defining the world coordinates for 3D points
+objp = np.zeros((1, CHECKERBOARD[0] * CHECKERBOARD[1], 3), np.float32)
+objp[0,:,:2] = np.mgrid[0:CHECKERBOARD[0], 0:CHECKERBOARD[1]].T.reshape(-1, 2)
+prev_img_shape = None
+
+# Extracting path of individual image stored in a given directory
+images = glob.glob('./cals/*.jpg')
+for fname in images:
+    img = cv.imread(fname)
+    gray = cv.cvtColor(img,cv.COLOR_BGR2GRAY)
+    # Find the chess board corners
+    # If desired number of corners are found in the image then ret = true
+    ret, corners = cv.findChessboardCorners(gray, CHECKERBOARD, cv.CALIB_CB_ADAPTIVE_THRESH + cv.CALIB_CB_FAST_CHECK + cv.CALIB_CB_NORMALIZE_IMAGE)
+    
+    """
+    If desired number of corner are detected,
+    we refine the pixel coordinates and display 
+    them on the images of checker board
+    """
+    if ret == True:
+        objpoints.append(objp)
+        # refining pixel coordinates for given 2d points.
+        corners2 = cv.cornerSubPix(gray, corners, (11,11),(-1,-1), criteria)
+        
+        imgpoints.append(corners2)
+
+        # Draw and display the corners
+        img = cv.drawChessboardCorners(img, CHECKERBOARD, corners2, ret)
+    
+    cv.imshow('img',img)
+    cv.waitKey(0)
+
+cv.destroyAllWindows()
+
+h,w = img.shape[:2]
+
+"""
+Performing camera calibration by 
+passing the value of known 3D points (objpoints)
+and corresponding pixel coordinates of the 
+detected corners (imgpoints)
+"""
+ret, mtx, dist, rvecs, tvecs = cv.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
+
+print("Camera matrix : \n")
+print(mtx)
+print("dist : \n")
+print(dist)
+print("rvecs : \n")
+print(rvecs)
+print("tvecs : \n")
+print(tvecs)
+
+
+# In[17]:
+
+
+#img = cv.imread("input_img.jpg")
 img = cv.imread("image2.png")
 img = cv.resize(img, (int(img.shape[1]*0.6), int(img.shape[0]*0.6)), cv.INTER_AREA)
 cntrs_t, cntrs_e = find_contours_auto(img) # auto-generated contours values --> will be changed
 
+# create a seperate window named 'controls' for trackbar
 cv.namedWindow('controls', cv.WINDOW_NORMAL)
+# create trackbars in 'controls' window
 cv.createTrackbar('Min Thresh','controls',0,255,nothing)
 cv.createTrackbar('Max Thresh','controls',255,255,nothing)
 cv.createTrackbar('Min Area','controls',2000,10000,nothing)
@@ -179,13 +292,21 @@ while(1):
 
     cv.imshow('Contoured Image', imgcopy)
 
-    #waitfor the user to press escape and break the while loop 
+    # wait for the user to press escape and break the while loop 
     k = cv.waitKey(1) & 0xFF
-    if k == 27:
+    if k == 27: 
         break
 
+# destroys all window
 cv.destroyAllWindows()
 
 x_coords, y_coords = find_centroids(cntrs_t)
 angs = calculate_orientation(cntrs_e)
 draw_features(img, cntrs_t, angs, x_coords, y_coords)
+
+
+# In[ ]:
+
+
+
+
