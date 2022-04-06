@@ -1,27 +1,10 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[9]:
-
-
 pip install --upgrade opencv-python numpy matplotlib
 
-
-# In[1]:
-
-
-# import opencv
 import cv2 as cv
-# import math functions
 import math
 import numpy as np
-# import system libraries
 import glob
 import os
-
-
-# In[2]:
-
 
 def find_contours_auto(image):
     # convert image to grayscale
@@ -52,10 +35,6 @@ def find_contours_auto(image):
     """
     return contours_main, contours_ext
 
-
-# In[13]:
-
-
 def find_contours_man(image, min_t, max_t, min_a, max_a):
     # convert image to grayscale
     imgray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
@@ -83,10 +62,6 @@ def find_contours_man(image, min_t, max_t, min_a, max_a):
 
     return contours_t, contours_e
 
-
-# In[4]:
-
-
 def find_centroids(contours):
     # instantiate two empty lists
     cX, cY = [], []
@@ -107,10 +82,6 @@ def find_centroids(contours):
         """
         
     return cX, cY
-
-
-# In[5]:
-
 
 def calculate_orientation(contours):
     # instantiate an empty list
@@ -136,10 +107,6 @@ def calculate_orientation(contours):
         cv.destroyAllWindows()
         """
     return angles
-
-
-# In[6]:
-
 
 def draw_contours(image, contours):
     # draw contours
@@ -189,33 +156,62 @@ def draw_features(image, contours, angles, cX, cY):
     cv.waitKey(0)
     cv.destroyAllWindows()
 
-
-# In[7]:
-
-
 def nothing(x): #dummy function for trackbar
     pass
 
+def check_folder(folder_name): #makes new directory if it does not already exist
+    path = os.path.join(os.getcwd(), folder_name)
+    print(path)
+    if not os.path.exists(path):
+        os.makedirs(path)
 
-# In[ ]:
+def clear_images(folder_name, image_start): #removes all specified images from folder
+    path = os.path.join(os.getcwd(), folder_name)
+    for fname in os.listdir(path):
+        if fname.startswith(image_start):
+            os.remove(os.path.join(path,fname))
 
+def take_webcam_pics(num, folder_name):
+    check_folder(folder_name)
+    #clear_images(folder_name, "calibration_pic")
+    
+    webcamVideo = cv.VideoCapture(0)
+    cv.namedWindow("webcam") # used to display camera feed
+    
+    i = 1
+    print("press space to save an image")
+    while i <= num:
+        ret, frame = webcamVideo.read()
+        if not ret: # check if camera is working
+            print("Camera off")
+            break
+            
+        cv.imshow("feed", frame) # display camera feed
+         
+        k = cv.waitKey(1) & 0xFF #gets value of key pressed
+        if k == 27: # esc key pressed
+            print("Escape hit, closing...")
+            break
+        elif k == 32: # space key pressed
+            image_path = os.path.join(os.getcwd(), folder_name, "calibration_pic_{}.jpg".format(i))
+            cv.imwrite(image_path, frame)            
+            print("saving image")
+            i += 1
+    webcamVideo.release()
+    cv.destroyAllWindows()      
+        
 
-# Defining the dimensions of checkerboard
 CHECKERBOARD = (6,9)
 criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
-# Creating vector to store vectors of 3D points for each checkerboard image
 objpoints = []
-# Creating vector to store vectors of 2D points for each checkerboard image
 imgpoints = []
 
-# Defining the world coordinates for 3D points
 objp = np.zeros((1, CHECKERBOARD[0] * CHECKERBOARD[1], 3), np.float32)
 objp[0,:,:2] = np.mgrid[0:CHECKERBOARD[0], 0:CHECKERBOARD[1]].T.reshape(-1, 2)
 prev_img_shape = None
 
-# Extracting path of individual image stored in a given directory
-images = glob.glob('./cals/*.jpg')
+images = glob.glob('./calibs/*.jpg')
 for fname in images:
     img = cv.imread(fname)
     gray = cv.cvtColor(img,cv.COLOR_BGR2GRAY)
@@ -262,18 +258,11 @@ print(rvecs)
 print("tvecs : \n")
 print(tvecs)
 
-
-# In[17]:
-
-
-#img = cv.imread("input_img.jpg")
 img = cv.imread("image2.png")
 img = cv.resize(img, (int(img.shape[1]*0.6), int(img.shape[0]*0.6)), cv.INTER_AREA)
 cntrs_t, cntrs_e = find_contours_auto(img) # auto-generated contours values --> will be changed
 
-# create a seperate window named 'controls' for trackbar
 cv.namedWindow('controls', cv.WINDOW_NORMAL)
-# create trackbars in 'controls' window
 cv.createTrackbar('Min Thresh','controls',0,255,nothing)
 cv.createTrackbar('Max Thresh','controls',255,255,nothing)
 cv.createTrackbar('Min Area','controls',2000,10000,nothing)
@@ -297,16 +286,8 @@ while(1):
     if k == 27: 
         break
 
-# destroys all window
 cv.destroyAllWindows()
 
 x_coords, y_coords = find_centroids(cntrs_t)
 angs = calculate_orientation(cntrs_e)
 draw_features(img, cntrs_t, angs, x_coords, y_coords)
-
-
-# In[ ]:
-
-
-
-
