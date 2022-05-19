@@ -72,7 +72,9 @@ def find_centroids(contours):
     for c in contours:
         # calculate moments for each contour
         M = cv.moments(c)
-
+        # avoid divide by zero error
+        if M["m00"] == 0:
+            return 0, 0
         # calculate x,y coordinate of center
         cX.append(int(M["m10"] / M["m00"]))
         cY.append(int(M["m01"] / M["m00"]))
@@ -230,9 +232,8 @@ def take_webcam_pics(num, folder_name):
     webcamVideo = cv.VideoCapture(0)
     cv.namedWindow("webcam") # used to display camera feed
     
-    i = 1
     print("press space to save an image")
-    while i <= num:
+    while num >= 1:
         ret, frame = webcamVideo.read()
         if not ret: # check if camera is working
             print("Camera off")
@@ -245,10 +246,10 @@ def take_webcam_pics(num, folder_name):
             print("Escape hit, closing...")
             break
         elif k == 32: # space key pressed
-            image_path = os.path.join(os.getcwd(), folder_name, "calibration_pic_{}.jpg".format(i))
+            image_path = os.path.join(os.getcwd(), folder_name, "calibration_pic_{}.jpg".format(num))
             cv.imwrite(image_path, frame)            
             print("saving image")
-            i += 1
+            num -= 1
     webcamVideo.release()
     cv.destroyAllWindows()      
         
@@ -290,7 +291,7 @@ def cam_cal(newpics = False): # determine if new cals are needed
             imgpoints.append(corners2)
 
             # Draw and display the corners
-            img = cv.drawChessboardCorners(img, CHECKERBOARD, corners2, ret)
+            #img = cv.drawChessboardCorners(img, CHECKERBOARD, corners2, ret)
 
         #cv.imshow('img',img) # show images
         #cv.waitKey(0)
@@ -330,6 +331,41 @@ def undistort_img(img, mtx, dist):
     #cv.imwrite('calibresult.png', dst)
     return dst
 
+def find_bottom_contour(contours):
+    sorted_contours = sorted(contours, key=lambda contours: cv.boundingRect(contours)[1], reverse=False) # sort left-to-right
+    leftmost = []
+    remainder = []
+    for ind, cnt in enumerate(sorted_contours):
+        if ind == 0:
+            leftmost = cnt
+        else:
+            remainder.append(cnt)
+    return leftmost, remainder
+    
+def draw_axes(imagedraw, origin, mtx, dist):
+    CHECKERBOARD = (7,10)
+    criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+    objp = np.zeros((CHECKERBOARD[0]*CHECKERBOARD[1],3), np.float32)
+    objp[:,:2] = np.mgrid[0:CHECKERBOARD[0],0:CHECKERBOARD[1]].T.reshape(-1,2)
+    axis = np.float32([[10,0,0], [0,10,0], [0,0,-10]]).reshape(-1,3)
+    
+    img = cv.imread("./calibs/calibration_pic_1.jpg")
+    gray = cv.cvtColor(img,cv.COLOR_BGR2GRAY)
+    ret, corners = cv.findChessboardCorners(gray, CHECKERBOARD, None)
+    if ret == True:
+        corners2 = cv.cornerSubPix(gray,corners,(11,11),(-1,-1),criteria)
+        # Find the rotation and translation vectors.
+        ret, rvecs, tvecs = cv.solvePnP(objp, corners2, mtx, dist)
+        # project 3D points to image plane
+        imgpts, jac = cv.projectPoints(axis, rvecs, tvecs, mtx, dist)
+        
+        # draw x,y,z axes from origin (leftmost centroid contour)
+        imagedraw = cv.line(imagedraw, origin, tuple(imgpts[0].ravel()), (255,0,0), 5)
+        imagedraw = cv.line(imagedraw, origin, tuple(imgpts[1].ravel()), (0,255,0), 5)
+        imagedraw = cv.line(imagedraw, origin, tuple(imgpts[2].ravel()), (0,0,255), 5)
+
+    return imagedraw
+
 display_type = 0 # image: 0 | video: 1
 
 ret, mtx, dist, rvecs, tvecs = cam_cal(False) # calibrate camera
@@ -355,8 +391,8 @@ while True:
             print("Camera off")
             break
     if display_type == 0: # static image capture
-        #img = cv.imread("input_img.jpg")
-        img = cv.imread("image2.png")
+        #img = cv.imread("input1.jpg")
+        img = cv.imread("input2.png")
         img = cv.resize(img, (int(img.shape[1]*0.6), int(img.shape[0]*0.6)), cv.INTER_AREA)
         #cntrs_t, cntrs_e = find_contours_auto(img) # auto-generated contours values --> will be changed
         imgcopy = img.copy()
@@ -369,9 +405,12 @@ while True:
     
     # calculate contours
     cntrs_t, cntrs_e = find_contours_man(imgcopy, min_thres, max_thres, area_min, area_max)
+    leftmost, cntrs_t = find_bottom_contour(cntrs_t) # pops left most contour from list for axes
+    _, cntrs_e = find_bottom_contour(cntrs_e) # shorten cntrs_e as well
     draw_contours(imgcopy, cntrs_t)
         
     #cv.imshow("orig_feed", frame) # display camera feed
+    imgcopy = draw_axes(imgcopy, tuple(find_centroids(leftmost)), mtx, dist) # draw axes using leftmost contour and calibration plane
     cv.imshow("undist_feed", imgcopy) # display undistorted camera feed
     
     k = cv.waitKey(1) & 0xFF #gets value of key pressed
