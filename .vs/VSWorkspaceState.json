@@ -1,0 +1,11 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\yolov5_obb",
+    "\\yolov5_obb\\utils",
+    "\\yolov5_obb\\utils\\nms_rotated",
+    "\\yolov5_obb\\utils\\nms_rotated\\src"
+  ],
+  "SelectedNode": "\\yolov5_obb\\utils\\nms_rotated",
+  "PreviewInSolutionExplorer": false
+}
