@@ -6,6 +6,7 @@ MODULE MainModule
     CONST robtarget bolts_bin:=[[-0.24,0.71,-30.42],[0.000182474,-0.646312,-0.763073,-0.000195613],[-1,-1,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
 	CONST robtarget intermediate:=[[29.14,-384.23,271.92],[0.000182163,-0.646284,-0.763097,-0.000124927],[-1,-1,-1,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
 	CONST robtarget origin:=[[0,0,-30.42],[0.000211603,-0.646247,-0.763128,-0.000148896],[-1,-1,-1,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    !VAR socketdev client_socket;
     
     PROC pick_and_place(robtarget pickup, robtarget place, pers wobjdata start, pers wobjdata end, num theta)
         !Reset Gripper; !make sure gripper is open
@@ -44,7 +45,6 @@ MODULE MainModule
         VAR string receive{5};
         VAR pos center:=[0,0,0];
         VAR num theta;
-        SocketClose client_socket;
         SocketCreate client_socket; ! Initialize the port for this client to connect to the server
 
         SocketConnect client_socket, "192.168.0.170",4455 \Time:=10;!"127.0.0.1"
